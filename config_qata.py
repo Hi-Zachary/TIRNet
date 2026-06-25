@@ -19,7 +19,7 @@ lr = 'cosineLR'
 
 n_channels = 3
 n_labels = 1
-epochs = 400
+epochs = 200
 
 img_size = 224
 print_frequency = 20
