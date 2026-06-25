@@ -15,7 +15,7 @@ parser.add_argument('--cfg_path', '-c', default='config_qata', metavar='CFG_PATH
 parser.add_argument('--gpu', '-g', default='0', metavar='cuda',
                     type=str,
                     help='device id')
-parser.add_argument('--test_session', '-t', default='session_09.25_00h27',
+parser.add_argument('--test_session', '-t', default=None,
                     type=str,
                     help='session name')
 parser.add_argument('--test_vis', '-v', default=False, type=bool, help='visilization')
@@ -162,6 +162,8 @@ if __name__ == '__main__':
         model_path = args.model_path
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"未找到模型文件: {model_path}")
+    elif test_session is None:
+        raise ValueError("请通过 --test_session 或 --model_path 指定模型路径")
     else:
         candidate_model_paths = []
         if hasattr(config, "base_run_dir"):

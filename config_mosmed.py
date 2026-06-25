@@ -68,5 +68,5 @@ def get_ViT_config():
     return config
 
 
-test_session = "session_11.20_04h27"
+test_session = None
 test_vis = False
