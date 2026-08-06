@@ -23,7 +23,6 @@ epochs = 200
 
 img_size = 224
 print_frequency = 20
-save_frequency = 5000
 vis_frequency = 5000
 early_stopping_patience = 100
 
@@ -66,7 +65,3 @@ def get_ViT_config():
     config.clip_backbone = "ViT-B/32"
     config.frozen_clip = True
     return config
-
-
-test_session = None
-test_vis = False

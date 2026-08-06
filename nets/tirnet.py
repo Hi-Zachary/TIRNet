@@ -54,11 +54,10 @@ class DownBlock(nn.Module):
 
 
 class TIRNet(nn.Module):
-    def __init__(self, global_config, config, n_channels=3, n_classes=1, img_size=224, vis=False):
+    def __init__(self, global_config, config, n_channels=3, n_classes=1, img_size=224):
         super().__init__()
         self.config = config
         self.global_config = global_config
-        self.vis = vis
         self.n_channels = n_channels
         self.n_classes = n_classes
         in_channels = config.base_channel
@@ -79,7 +78,6 @@ class TIRNet(nn.Module):
                                    out_channels=in_channels, text_dim=512, upsampling_method="bilinear")
         self.outc = nn.Conv2d(in_channels, n_classes, kernel_size=(1, 1), stride=(1, 1))
         self.last_activation = nn.Sigmoid()
-        self.multi_activation = nn.Softmax()
         self.text_module4 = nn.Conv1d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
         self.load_clip(config)
 
@@ -140,16 +138,11 @@ class TIRNet(nn.Module):
 
         text_emb_pooled = text_feat.mean(dim=1)
 
-        x, map_sim4, L_pos4, L_neg4 = self.up4(img_feat4, img_feat3, text_emb_pooled)
-        x, map_sim3, L_pos3, L_neg3 = self.up3(x, img_feat2, text_emb_pooled)
-        x, map_sim2, L_pos2, L_neg2 = self.up2(x, img_feat1, text_emb_pooled)
-        x, map_sim1, L_pos1, L_neg1 = self.up1(x, x1, text_emb_pooled)
+        x, map_sim4, _, L_neg4 = self.up4(img_feat4, img_feat3, text_emb_pooled)
+        x, map_sim3, _, L_neg3 = self.up3(x, img_feat2, text_emb_pooled)
+        x, map_sim2, _, L_neg2 = self.up2(x, img_feat1, text_emb_pooled)
+        x, map_sim1, _, L_neg1 = self.up1(x, x1, text_emb_pooled)
 
-        self.last_illumination_maps = {
-            'map_sim': [map_sim1, map_sim2, map_sim3, map_sim4],
-            'L_pos': [L_pos1, L_pos2, L_pos3, L_pos4],
-            'L_neg': [L_neg1, L_neg2, L_neg3, L_neg4]
-        }
         if mode != "test" and masks is not None:
             gt = (masks > 0.5).float()
             if gt.dim() == 3:

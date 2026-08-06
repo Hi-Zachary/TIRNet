@@ -4,27 +4,11 @@ Adapted from: https://github.com/openai/CLIP/blob/main/clip/clip.py
 from collections import OrderedDict
 from typing import Tuple, Union
 
-import hashlib
-import os
-import urllib
-import warnings
-from tqdm import tqdm
 from .module_transformer import Transformer as TransformerClip
 import torch
 import torch.nn.functional as F
 from torch import nn
-import pdb
-from timm.models.layers import DropPath
-from einops import rearrange
 
-_MODELS = {
-    "RN50": "https://openaipublic.azureedge.net/clip/models/afeb0e10f9e5a86da6080e35cf09123aca3b358a0c3e3b6c78a7b63bc04b6762/RN50.pt",
-    "RN101": "https://openaipublic.azureedge.net/clip/models/8fa8567bab74a42d41c5915025a8e4538c3bdbe8804a470a72f30b0d94fab599/RN101.pt",
-    "RN50x4": "https://openaipublic.azureedge.net/clip/models/7e526bd135e493cef0776de27d5f42653e6b4c8bf9e0f653bb11773263205fdd/RN50x4.pt",
-    "RN50x16": "https://openaipublic.azureedge.net/clip/models/52378b407f34354e150460fe41077663dd5b39c54cd0bfd2b27167a4a06ec9aa/RN50x16.pt",
-    "ViT-B/32": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
-    "ViT-B/16": "https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt",
-}
 _PT_NAME = {
     "RN50": "RN50.pt",
     "RN101": "RN101.pt",
@@ -34,46 +18,6 @@ _PT_NAME = {
     "ViT-B/16": "ViT-B-16.pt",
     "ViT-L/14": "ViT-L-14.pt",
 }
-
-
-def _download(url: str, root: str = os.path.expanduser("~/.cache/clip")):
-    os.makedirs(root, exist_ok=True)
-    filename = os.path.basename(url)
-
-    expected_sha256 = url.split("/")[-2]
-    download_target = os.path.join(root, filename)
-
-    if os.path.exists(download_target) and not os.path.isfile(download_target):
-        raise RuntimeError(f"{download_target} exists and is not a regular file")
-
-    if os.path.isfile(download_target):
-        if hashlib.sha256(open(download_target, "rb").read()).hexdigest() == expected_sha256:
-            return download_target
-        else:
-            warnings.warn(f"{download_target} exists, but the SHA256 checksum does not match; re-downloading the file")
-
-    with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
-        with tqdm(total=int(source.info().get("Content-Length")), ncols=80, unit='iB', unit_scale=True) as loop:
-            while True:
-                buffer = source.read(8192)
-                if not buffer:
-                    break
-
-                output.write(buffer)
-                loop.update(len(buffer))
-
-    if hashlib.sha256(open(download_target, "rb").read()).hexdigest() != expected_sha256:
-        raise RuntimeError(f"Model has been downloaded but the SHA256 checksum does not not match")
-
-    return download_target
-
-
-def available_models():
-    """Returns the names of available CLIP models"""
-    return list(_MODELS.keys())
-
-
-# =============================
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -217,26 +161,6 @@ class ModifiedResNet(nn.Module):
 
         return x
 
-class Adapter(nn.Module):
-    def __init__(self, D_features, mlp_ratio=0.25, act_layer=nn.GELU, skip_connect=True):
-        super().__init__()
-        self.skip_connect = skip_connect
-        D_hidden_features = int(D_features * mlp_ratio)
-        self.act = act_layer()
-        self.D_fc1 = nn.Linear(D_features, D_hidden_features)
-        self.D_fc2 = nn.Linear(D_hidden_features, D_features)
-        
-    def forward(self, x):
-        # x is (BT, HW+1, D)
-        xs = self.D_fc1(x)
-        xs = self.act(xs)
-        xs = self.D_fc2(xs)
-        if self.skip_connect:
-            x = x + xs
-        else:
-            x = xs
-        return x
-
 class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
 
@@ -249,52 +173,6 @@ class LayerNorm(nn.LayerNorm):
 class QuickGELU(nn.Module):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
-
-# class ResidualAttentionBlock(nn.Module):
-#     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None, scale=1., num_tadapter=1, num_frames=8, drop_path=0.):
-#         super().__init__()
-#         self.num_tadapter = num_tadapter
-#         self.attn = nn.MultiheadAttention(d_model, n_head)
-#         self.ln_1 = LayerNorm(d_model)
-#         self.mlp = nn.Sequential(OrderedDict([
-#             ("c_fc", nn.Linear(d_model, d_model * 4)),
-#             ("gelu", QuickGELU()),
-#             ("c_proj", nn.Linear(d_model * 4, d_model))
-#         ]))
-#         self.ln_2 = LayerNorm(d_model)
-#         self.attn_mask = attn_mask
-#         self.n_head = n_head
-
-#         self.MLP_Adapter = Adapter(d_model, skip_connect=False)
-#         self.S_Adapter = Adapter(d_model)
-#         self.scale = scale
-#         self.T_Adapter = Adapter(d_model, skip_connect=False)
-#         if num_tadapter == 2:
-#             self.T_Adapter_in = Adapter(d_model)
-#         self.num_frames = num_frames
-#         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-
-#     def attention(self, x: torch.Tensor):
-#         self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
-#         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
-
-#     def forward(self, x: torch.Tensor):
-#         ## x shape [HW+1, BT, D]
-#         n, bt, d = x.shape
-#         ## temporal adaptation
-#         xt = rearrange(x, 'n (b t) d -> t (b n) d', t=self.num_frames)
-#         if self.num_tadapter == 2:
-#             xt = self.T_Adapter(self.attention(self.T_Adapter_in(self.ln_1(xt))))
-#         else:
-#             xt = self.T_Adapter(self.attention(self.ln_1(xt)))
-#         xt = rearrange(xt, 't (b n) d -> n (b t) d', n=n)
-#         x = x + self.drop_path(xt)
-#         ## spatial adaptation
-#         x = x + self.S_Adapter(self.attention(self.ln_1(x)))
-#         ## joint adaptation
-#         xn = self.ln_2(x)
-#         x = x + self.mlp(xn) + self.drop_path(self.scale * self.MLP_Adapter(xn))
-#         return x
 
 class ResidualAttentionBlock(nn.Module):
     def __init__(self, d_model: int, n_head: int, attn_mask=None):
@@ -482,31 +360,6 @@ class CLIP(nn.Module):
 
         if self.text_projection is not None:
             nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
-
-    @staticmethod
-    def get_config(pretrained_clip_name="ViT-B/32"):
-        model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ViT-B-32.pt")
-        if pretrained_clip_name in _MODELS and pretrained_clip_name in _PT_NAME:
-            model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), _PT_NAME[pretrained_clip_name])
-
-        if pretrained_clip_name in ["ViT-B/32", "ViT-B/16"] and os.path.exists(model_path):
-            pass
-        else:
-            if pretrained_clip_name in _MODELS:
-                model_path = _download(_MODELS[pretrained_clip_name])
-            elif os.path.isfile(pretrained_clip_name):
-                model_path = pretrained_clip_name
-            else:
-                raise RuntimeError(f"Model {pretrained_clip_name} not found; available models = {available_models()}")
-
-        try:
-            # loading JIT archive
-            model = torch.jit.load(model_path, map_location="cpu").eval()
-            state_dict = model.state_dict()
-        except RuntimeError:
-            state_dict = torch.load(model_path, map_location="cpu")
-
-        return state_dict
 
     def build_attention_mask(self, context_length):
         # lazily create causal attention mask, with full attention between the vision tokens

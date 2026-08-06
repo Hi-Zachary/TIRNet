@@ -2,18 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import logging
-from timm.models.layers import drop_path
 import torch
 from torch import nn
-from .until_module import LayerNorm, ACT2FN
 from collections import OrderedDict
-
-logger = logging.getLogger(__name__)
-
-PRETRAINED_MODEL_ARCHIVE_MAP = {}
-CONFIG_NAME = 'cross_config.json'
-WEIGHTS_NAME = 'cross_pytorch_model.bin'
 
 
 class LayerNorm(nn.LayerNorm):
@@ -31,7 +22,7 @@ class QuickGELU(nn.Module):
 
 
 class ResidualAttentionBlock(nn.Module):
-    def __init__(self, d_model: int, n_head: int, attn_mask=None):
+    def __init__(self, d_model: int, n_head: int):
         super(ResidualAttentionBlock, self).__init__()
 
         self.attn = nn.MultiheadAttention(d_model, n_head)
@@ -42,7 +33,6 @@ class ResidualAttentionBlock(nn.Module):
             ("c_proj", nn.Linear(d_model * 4, d_model))
         ]))
         self.ln_2 = LayerNorm(d_model)
-        self.attn_mask = attn_mask
         self.n_head = n_head
 
     def attention(self, x: torch.Tensor, attn_mask_: torch.Tensor):
@@ -58,7 +48,7 @@ class ResidualAttentionBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, width: int, layers: int, heads: int, attn_mask=None):
+    def __init__(self, width: int, layers: int, heads: int):
         super(Transformer, self).__init__()
         self.width = width
         self.layers = layers

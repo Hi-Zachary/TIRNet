@@ -185,20 +185,10 @@ def main_loop(batch_size=config.batch_size, model_type='', tensorboard=True):
         optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=lr, weight_decay=config.weight_decay)
     else:
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)  # Choose optimize
-    if config.lr == 'cosineLR':
-        t_max = float(config.epochs)
-        lr_max = float(getattr(config, "learning_rate", lr))
-        eta_min = float(getattr(config, "cosine_eta_min", 1e-4))
-        lr_scheduler = SingleCycleCosineDecay(optimizer, lr_max=lr_max, eta_min=eta_min, t_max=t_max)
-    elif config.lr == 'exp':
-        lambda1 = lambda epoch: max(0.99**epoch, 0.1)
-        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda = lambda1)
-    elif config.lr == 'cosine':
-        cosine_lr = lambda step: 0.5 * (math.cos(step / (len(train_loader) * config.epochs) * math.pi) + 1)
-        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=cosine_lr)
-    elif config.lr == 'poly':
-        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-                                                     lambda x: (1 - x / (len(train_loader) * config.epochs)) ** 0.99)
+    t_max = float(config.epochs)
+    lr_max = float(getattr(config, "learning_rate", lr))
+    eta_min = float(getattr(config, "cosine_eta_min", 1e-4))
+    lr_scheduler = SingleCycleCosineDecay(optimizer, lr_max=lr_max, eta_min=eta_min, t_max=t_max)
 
     print(config.lr)
     if tensorboard:

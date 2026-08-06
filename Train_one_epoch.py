@@ -6,9 +6,9 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-def print_summary(epoch, i, nb_batch, loss, loss_dict, loss_name, batch_time,
+def print_summary(epoch, i, nb_batch, loss, loss_dict, loss_name,
                   average_loss, average_time, iou, average_iou,
-                  dice, average_dice, acc, average_acc, mode, lr, logger, data_time_ave):
+                  dice, average_dice, mode, lr, logger, data_time_ave):
     '''
         mode = Train or Test
     '''
@@ -29,16 +29,12 @@ def print_summary(epoch, i, nb_batch, loss, loss_dict, loss_name, batch_time,
     string += '(Avg {:.4f}) '.format(average_iou)
     string += 'Dice:{:.4f} '.format(dice)
     string += '(Avg {:.4f}) '.format(average_dice)
-    # string += 'Acc:{:.3f} '.format(acc)
-    # string += '(Avg {:.4f}) '.format(average_acc)
     if mode == 'Train':
         string += 'LR {:.6f}   '.format(lr)
-    # string += 'Time {:.1f} '.format(batch_time)
     string += '(AvgTime {:.1f})   '.format(average_time)
     string += '(AvgDataTime {:.2f})   '.format(data_time_ave)
     summary += string
     logger.info(summary)
-    # print summary
 
 
 ##################################################################################
@@ -50,7 +46,7 @@ def train_one_epoch(config, loader, model, criterion, optimizer, writer, epoch, 
     logging_mode = 'Train' if model.training else 'Val'
     end = time.time()
     time_sum, loss_sum, data_time_sum = 0, 0, 0
-    dice_sum, iou_sum, acc_sum = 0.0, 0.0, 0.0
+    dice_sum, iou_sum = 0.0, 0.0
     dices = []
     dataiter = iter(loader)
     steps = len(loader)
@@ -69,9 +65,8 @@ def train_one_epoch(config, loader, model, criterion, optimizer, writer, epoch, 
         images, masks, text_token, text_mask = images.cuda(), masks.cuda(), text_token.cuda(), text_mask.cuda()
 
         if model.training and lr_scheduler is not None:
-            if getattr(config, "lr", "") == "cosineLR":
-                t = epoch + (i - 1) / max(1, steps)
-                lr_scheduler.step(t)
+            t = epoch + (i - 1) / max(1, steps)
+            lr_scheduler.step(t)
 
         # ====================================================
         #             Compute loss
@@ -109,7 +104,6 @@ def train_one_epoch(config, loader, model, criterion, optimizer, writer, epoch, 
         time_sum += len(images) * batch_time
         loss_sum += len(images) * out_loss
         iou_sum += len(images) * train_iou
-        # acc_sum += len(images) * train_acc
         dice_sum += len(images) * train_dice
         data_time_sum += data_time
 
@@ -117,23 +111,21 @@ def train_one_epoch(config, loader, model, criterion, optimizer, writer, epoch, 
             average_loss = loss_sum / (config.batch_size*(i-1) + len(images))
             average_time = time_sum / (config.batch_size*(i-1) + len(images))
             train_iou_average = iou_sum / (config.batch_size*(i-1) + len(images))
-            # train_acc_average = acc_sum / (config.batch_size*(i-1) + len(images))
             train_dice_avg = dice_sum / (config.batch_size*(i-1) + len(images))
         else:
             average_loss = loss_sum / (i * config.batch_size)
             average_time = time_sum / (i * config.batch_size)
             train_iou_average = iou_sum / (i * config.batch_size)
-            # train_acc_average = acc_sum / (i * config.batch_size)
             train_dice_avg = dice_sum / (i * config.batch_size)
 
         end = time.time()
         torch.cuda.empty_cache()
 
         if i % config.print_frequency == 0:
-            print_summary(epoch + 1, i, len(loader), out_loss, loss_dict, loss_name, batch_time,
+            print_summary(epoch + 1, i, len(loader), out_loss, loss_dict, loss_name,
                           average_loss, average_time, train_iou, train_iou_average,
-                          train_dice, train_dice_avg, 0, 0,  logging_mode,
-                          lr=min(g["lr"] for g in optimizer.param_groups),logger=logger, 
+                          train_dice, train_dice_avg, logging_mode,
+                          lr=min(g["lr"] for g in optimizer.param_groups), logger=logger,
                           data_time_ave=data_time_sum/config.print_frequency)
             data_time_sum = 0
         if config.tensorboard:
@@ -142,14 +134,8 @@ def train_one_epoch(config, loader, model, criterion, optimizer, writer, epoch, 
 
             # plot metrics in tensorboard
             writer.add_scalar(logging_mode + '_iou', train_iou, step)
-            # writer.add_scalar(logging_mode + '_acc', train_acc, step)
             writer.add_scalar(logging_mode + '_dice', train_dice, step)
-        if model.training and config.lr == 'poly' and lr_scheduler is not None:
-            lr_scheduler.step()
 
         torch.cuda.empty_cache()
-
-    if model.training and lr_scheduler is not None and config.lr not in ('poly', 'cosineLR'):
-        lr_scheduler.step()
 
     return average_loss, train_dice_avg
