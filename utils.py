@@ -20,7 +20,7 @@ class BCELoss(nn.Module):
         loss = F.binary_cross_entropy(
             pred,
             target,
-            reduction="none"
+            reduction="mean"
         )
         return loss
 
@@ -66,16 +66,14 @@ class DiceBCELoss(nn.Module):
         self.bce_loss = BCELoss()
 
     def _show_dice(self, inputs, targets):
-        inputs[inputs >= 0.5] = 1
-        inputs[inputs < 0.5] = 0
-        targets[targets > 0] = 1
-        targets[targets <= 0] = 0
-        hard_dice_coeff = 1.0 - self.dice_loss(inputs, targets)
+        pred = (inputs >= 0.5).float()
+        target = (targets > 0).float()
+        hard_dice_coeff = 1.0 - self.dice_loss(pred, target)
         return hard_dice_coeff
 
     def forward(self, pred, target):
         dice = self.dice_loss(pred, target)
-        bce = self.bce_loss(pred, target).mean()
+        bce = self.bce_loss(pred, target)
 
         loss = (
             self.dice_weight * dice
