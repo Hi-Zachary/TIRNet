@@ -7,50 +7,63 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class WeightedBCE(nn.Module):
+class BCELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
 
-    def __init__(self, weights=[0.4, 0.6]):
-        super(WeightedBCE, self).__init__()
-        self.weights = weights
+    def forward(self, pred, target):
+        pred = pred.view(-1)
+        target = target.view(-1)
 
-    def forward(self, logit_pixel, truth_pixel):
-        logit = logit_pixel.view(-1)
-        truth = truth_pixel.view(-1)
-        assert (logit.shape == truth.shape)
-        loss = F.binary_cross_entropy(logit, truth, reduction='none')
+        assert pred.shape == target.shape
+
+        loss = F.binary_cross_entropy(
+            pred,
+            target,
+            reduction="none"
+        )
         return loss
 
 
-class WeightedDiceLoss(nn.Module):
-    def __init__(self, weights=[0.5, 0.5]):
-        super(WeightedDiceLoss, self).__init__()
-        self.weights = weights
+class DiceLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
 
-    def forward(self, logit, truth, smooth=1e-5):
-        batch_size = len(logit)
-        logit = logit.view(batch_size, -1)
-        truth = truth.view(batch_size, -1)
-        assert (logit.shape == truth.shape)
-        p = logit.view(batch_size, -1)
-        t = truth.view(batch_size, -1)
-        w = truth.detach()
-        w = w * (self.weights[1] - self.weights[0]) + self.weights[0]
-        p = w * (p)
-        t = w * (t)
-        intersection = (p * t).sum(-1)
-        union = (p * p).sum(-1) + (t * t).sum(-1)
-        dice = 1 - (2 * intersection + smooth) / (union + smooth)
-        loss = dice.mean()
-        return loss
+    def forward(self, pred, target, smooth=1e-5):
+        batch_size = pred.shape[0]
+
+        pred = pred.view(batch_size, -1)
+        target = target.view(batch_size, -1)
+
+        assert pred.shape == target.shape
+
+        intersection = (pred * target).sum(dim=1)
+
+        denominator = (
+            (pred * pred).sum(dim=1)
+            + (target * target).sum(dim=1)
+        )
+
+        dice = (
+            2.0 * intersection + smooth
+        ) / (
+            denominator + smooth
+        )
+
+        loss = 1.0 - dice
+
+        return loss.mean()
 
 
-class WeightedDiceBCE(nn.Module):
-    def __init__(self, dice_weight=1, BCE_weight=1):
-        super(WeightedDiceBCE, self).__init__()
-        self.BCE_loss = WeightedBCE(weights=[0.5, 0.5])
-        self.dice_loss = WeightedDiceLoss(weights=[0.5, 0.5])
-        self.BCE_weight = BCE_weight
+class DiceBCELoss(nn.Module):
+    def __init__(self, dice_weight=0.5, bce_weight=0.5):
+        super().__init__()
+
         self.dice_weight = dice_weight
+        self.bce_weight = bce_weight
+
+        self.dice_loss = DiceLoss()
+        self.bce_loss = BCELoss()
 
     def _show_dice(self, inputs, targets):
         inputs[inputs >= 0.5] = 1
@@ -60,11 +73,16 @@ class WeightedDiceBCE(nn.Module):
         hard_dice_coeff = 1.0 - self.dice_loss(inputs, targets)
         return hard_dice_coeff
 
-    def forward(self, inputs, targets):
-        dice = self.dice_loss(inputs, targets)
-        BCE = self.BCE_loss(inputs, targets)
-        dice_BCE_loss = self.dice_weight * dice + self.BCE_weight * BCE
-        return dice_BCE_loss
+    def forward(self, pred, target):
+        dice = self.dice_loss(pred, target)
+        bce = self.bce_loss(pred, target).mean()
+
+        loss = (
+            self.dice_weight * dice
+            + self.bce_weight * bce
+        )
+
+        return loss
 
 
 def iou_on_batch(masks, pred):

@@ -34,7 +34,7 @@ from torch.utils.data import DataLoader
 import logging
 from Train_one_epoch import train_one_epoch
 from torchvision import transforms
-from utils import WeightedDiceBCE, read_text, profile_params_flops
+from utils import DiceBCELoss, read_text, profile_params_flops
 
 def set_global_seed(seed: int, deterministic: bool = True):
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -180,7 +180,7 @@ def main_loop(batch_size=config.batch_size, model_type='', tensorboard=True):
                             generator=data_generator,
                             num_workers=8,
                             pin_memory=True)
-    criterion = WeightedDiceBCE(dice_weight=0.5, BCE_weight=0.5)
+    criterion = DiceBCELoss(dice_weight=0.5, bce_weight=0.5)
     if config.optimizer == "AdamW":
         optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=lr, weight_decay=config.weight_decay)
     else:
