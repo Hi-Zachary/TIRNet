@@ -1,7 +1,7 @@
 <h1 align="center">Text as Illumination: Spatial Contrastive Retinex Learning<br>for Language-guided Medical Image Segmentation</h1>
 
 <p align="center">
-    <img src="assets/overview.svg" alt="Overall Framework of TIRNet" style="width:100%;">
+    <img src="assets/Overview.svg" alt="Overall Framework of TIRNet" style="width:100%;">
 </p>
 <p align="center" style="font-size: 18px; color: gray;">
     Figure 1: Overview of the TIRNet. It integrates RTMB and CDCB into each decoder stage. The RGC-Loss maximizes cross-modal similarity in text-relevant foregrounds and suppresses background activations to enlarge the foreground-background margin.
