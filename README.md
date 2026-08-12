@@ -166,4 +166,27 @@ python test_model.py --cfg_path config_qata --model_path outputs/QaTa/TIRNet/<se
 
 Reports four foreground metrics: mean per-image Dice/IoU and global pixel Dice/IoU.
 
+---
+
+## **Citation**
+
+If you find TIRNet helpful in your research, please consider citing:
+
+```bibtex
+@misc{shi2026textilluminationspatialcontrastive,
+      title={Text as Illumination: Spatial Contrastive Retinex Learning for Language-guided Medical Image Segmentation}, 
+      author={Jian Shi and Cheng Zhen and Pingping Zhang and Rui Xu and Yanan Lv and Yili Ma and Huan Bi and Haojie Li and Huchuan Lu},
+      year={2026},
+      eprint={2606.27794},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2606.27794}, 
+}
+```
+
+## **Acknowledgement**
+
+Thanks to the open-source of the following projects:
+[ShawnHuang497/RecLMIS](https://github.com/ShawnHuang497/RecLMIS)
+
 
